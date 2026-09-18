@@ -54,7 +54,7 @@ Jira ticket ──▶ Webhook ──▶ FastAPI receiver (dedup + lock)
 
 ---
 
-## Why this is agentic, not just "an LLM call with a prompt"
+## Metrics and Guardrails
 
 | Concern | How it's handled |
 |---|---|
