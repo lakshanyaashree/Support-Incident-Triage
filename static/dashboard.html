@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Incident Triage Agent</title>
+<style>
+  :root {
+    --jira-blue: #0052CC;
+    --jira-blue-light: #4C9AFF;
+    --jira-blue-bg: #DEEBFF;
+    --jira-bg: #F4F5F7;
+    --jira-surface: #FFFFFF;
+    --jira-text: #172B4D;
+    --jira-subtle: #6B778C;
+    --jira-border: #DFE1E6;
+    --jira-green: #36B37E;
+    --jira-green-bg: #E3FCEF;
+    --jira-red: #DE350B;
+    --jira-red-bg: #FFEBE6;
+    --jira-orange: #FF991F;
+    --jira-orange-bg: #FFF4E5;
+    --jira-yellow: #FFAB00;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--jira-bg);
+    color: var(--jira-text);
+    margin: 0;
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    background: var(--jira-surface);
+    border-bottom: 1px solid var(--jira-border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brand-mark {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--jira-blue);
+    color: white;
+    font-weight: 700;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .brand-text .company {
+    font-size: 11px;
+    color: var(--jira-subtle);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 600;
+  }
+
+  .brand-text h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--jira-text);
+  }
+
+  .clock {
+    text-align: right;
+  }
+
+  .clock .time {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--jira-blue);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .clock .date {
+    font-size: 12px;
+    color: var(--jira-subtle);
+  }
+
+  /* ---------- Layout ---------- */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 20px;
+    padding: 24px 28px;
+    align-items: start;
+  }
+
+  .panel {
+    background: var(--jira-surface);
+    border: 1px solid var(--jira-border);
+    border-radius: 8px;
+    padding: 18px;
+    margin-bottom: 20px;
+  }
+
+  .panel h3 {
+    margin: 0 0 14px;
+    font-size: 12px;
+    color: var(--jira-subtle);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 700;
+  }
+
+  /* ---------- Tables ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--jira-border); vertical-align: top; }
+  th { color: var(--jira-subtle); text-transform: uppercase; font-size: 10.5px; letter-spacing: .05em; font-weight: 700; }
+  tr:last-child td { border-bottom: none; }
+  #tickets-wrap { max-height: 320px; overflow-y: auto; }
+  .muted { color: var(--jira-subtle); }
+
+  .badge {
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    display: inline-block;
+  }
+  .badge.Highest, .badge.High { background: var(--jira-red-bg); color: var(--jira-red); }
+  .badge.Medium { background: var(--jira-orange-bg); color: var(--jira-orange); }
+  .badge.Low { background: var(--jira-green-bg); color: var(--jira-green); }
+
+  .ticket-key {
+    color: var(--jira-blue);
+    font-weight: 700;
+    font-size: 12.5px;
+  }
+
+  /* ---------- Search ---------- */
+  input[type=text] {
+    width: 62%;
+    padding: 9px 12px;
+    background: var(--jira-bg);
+    border: 1px solid var(--jira-border);
+    color: var(--jira-text);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--jira-blue-light); background: var(--jira-surface); }
+
+  button {
+    padding: 9px 18px;
+    background: var(--jira-blue);
+    border: none;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 13px;
+    margin-left: 8px;
+  }
+  button:hover { background: #0747A6; }
+
+  .result { border-bottom: 1px solid var(--jira-border); padding: 12px 0; font-size: 13px; }
+  .result:last-child { border-bottom: none; }
+  .result b { color: var(--jira-blue); }
+
+  /* ---------- Live log ---------- */
+  #logs { height: 240px; overflow-y: auto; font-size: 12px; font-family: 'Consolas', monospace; background: #F4F5F7; border-radius: 6px; padding: 10px 12px; }
+  .log-line { padding: 4px 0; border-bottom: 1px solid var(--jira-border); white-space: pre-wrap; word-break: break-word; }
+  .log-line:last-child { border-bottom: none; }
+  .log-line .t { color: var(--jira-subtle); margin-right: 8px; }
+  .log-line.error { color: var(--jira-red); }
+  .log-line.webhook { color: var(--jira-green); }
+  .log-line.agent { color: #B25F00; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--jira-subtle);
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .dot.open { background: var(--jira-orange); }
+  .dot.closed { background: var(--jira-green); }
+  .dot.active { background: var(--jira-green); box-shadow: 0 0 0 3px var(--jira-green-bg); }
+
+  .side-card {
+    border: 1px solid var(--jira-border);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .side-card:last-child { margin-bottom: 0; }
+
+  .side-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+
+  .side-card-title {
+    font-size: 12.5px;
+    color: var(--jira-text);
+    margin: 2px 0 8px;
+    line-height: 1.4;
+  }
+
+  .side-card-meta {
+    font-size: 11px;
+    color: var(--jira-subtle);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .users-list {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--jira-border);
+  }
+
+  .user-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11.5px;
+    color: var(--jira-text);
+    padding: 3px 0;
+  }
+
+  .user-row .muted { font-size: 10.5px; }
+
+  .closed-strip {
+    background: var(--jira-green-bg);
+    border: 1px solid #ABF5D1;
+  }
+
+  .sidebar-section { margin-bottom: 22px; }
+  .sidebar-section:last-child { margin-bottom: 0; }
+
+  .empty-state { font-size: 12px; color: var(--jira-subtle); padding: 8px 0; }
+
+  /* ---------- Eval panel (#7) ---------- */
+  .eval-card {
+    border: 1px solid var(--jira-border);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .eval-card:last-child { margin-bottom: 0; }
+  .eval-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .pill {
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+  }
+  .pill.high { background: var(--jira-green-bg); color: var(--jira-green); }
+  .pill.low { background: var(--jira-orange-bg); color: var(--jira-orange); }
+  .pill.pass { background: var(--jira-green-bg); color: var(--jira-green); }
+  .pill.fail { background: var(--jira-red-bg); color: var(--jira-red); }
+  .pill.review { background: var(--jira-red-bg); color: var(--jira-red); }
+  .eval-reasoning {
+    font-size: 12px;
+    color: var(--jira-text);
+    margin: 6px 0;
+    line-height: 1.45;
+  }
+  .eval-notes {
+    font-size: 11px;
+    color: var(--jira-subtle);
+    font-style: italic;
+    margin-bottom: 8px;
+  }
+  .eval-actions { display: flex; gap: 8px; align-items: center; }
+  .eval-actions button {
+    padding: 5px 12px;
+    font-size: 11.5px;
+    margin-left: 0;
+  }
+  .btn-correct { background: var(--jira-green); }
+  .btn-correct:hover { background: #2A9E6D; }
+  .btn-incorrect { background: var(--jira-red); }
+  .btn-incorrect:hover { background: #BF2600; }
+  .label-tag {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 4px;
+  }
+  .label-tag.correct { background: var(--jira-green-bg); color: var(--jira-green); }
+  .label-tag.incorrect { background: var(--jira-red-bg); color: var(--jira-red); }
+  #eval-list { max-height: 460px; overflow-y: auto; }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-mark">IT</div>
+    <div class="brand-text">
+      <div class="company">Acme Corp &middot; IT Operations</div>
+      <h1>Incident Triage Agent</h1>
+    </div>
+  </div>
+  <div class="clock">
+    <div class="time" id="clock-time">--:--:--</div>
+    <div class="date" id="clock-date">Loading...</div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- Main column -->
+  <div>
+    <div class="panel">
+      <h3>Live tickets</h3>
+      <div id="tickets-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ticket</th>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Priority</th>
+              <th>Team</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody id="tickets-body">
+            <tr><td colspan="6" class="empty-state">No tickets yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Search past incidents</h3>
+      <input type="text" id="query" placeholder="e.g. api error" onkeydown="if(event.key==='Enter') doSearch()">
+      <button onclick="doSearch()">Search</button>
+      <div id="results"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Live log</h3>
+      <div id="logs"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Agent decisions &middot; eval</h3>
+      <div class="sub" style="margin-bottom:12px;">
+        Every triage run, with its retrieval confidence and self-check result. Needs Support Analyst Review.
+      </div>
+      <div id="eval-list">
+        <div class="empty-state">No decisions logged yet</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div>
+    <div class="panel">
+      <div class="sidebar-section">
+        <div class="sidebar-title"><span class="dot open"></span> Open incidents</div>
+        <div id="sidebar-open">
+          <div class="empty-state">No open incidents</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title"><span class="dot closed"></span> Recently closed</div>
+        <div id="sidebar-closed">
+          <div class="empty-state">Nothing closed yet</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/* ---------- Clock ---------- */
+function tickClock() {
+  const now = new Date();
+  document.getElementById('clock-time').textContent =
+    now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  document.getElementById('clock-date').textContent =
+    now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+/* ---------- Search ---------- */
+async function doSearch() {
+  const q = document.getElementById('query').value.trim();
+  if (!q) return;
+  const box = document.getElementById('results');
+  box.innerHTML = '<div class="muted">Searching...</div>';
+  const res = await fetch('/search?query=' + encodeURIComponent(q));
+  const data = await res.json();
+  if (!data.length) { box.innerHTML = '<div class="muted">No similar incidents found.</div>'; return; }
+  box.innerHTML = data.map(r => `
+    <div class="result">
+      <b>${escapeHtml(r.ticket_number)}</b> -- ${escapeHtml(r.title)}<br>
+      <span class="muted">Team: ${escapeHtml(r.team)} | Severity: ${escapeHtml(r.severity)} | Similarity: ${r.similarity.toFixed(3)}</span><br>
+      ${escapeHtml(r.resolution || '')}
+    </div>`).join('');
+}
+
+/* ---------- Live tickets (in-memory feed from webhook activity) ---------- */
+let lastTicketsSignature = '';
+async function pollTickets() {
+  const res = await fetch('/tickets');
+  const data = await res.json();
+  const signature = JSON.stringify(data);
+  if (signature === lastTicketsSignature) return;
+  lastTicketsSignature = signature;
+
+  const body = document.getElementById('tickets-body');
+  if (!data.length) {
+    body.innerHTML = '<tr><td colspan="6" class="empty-state">No tickets yet</td></tr>';
+    return;
+  }
+  body.innerHTML = data.map(t => `
+    <tr>
+      <td><span class="ticket-key">${escapeHtml(t.ticket_key)}</span></td>
+      <td>${escapeHtml(t.title)}</td>
+      <td>${escapeHtml(t.status)}</td>
+      <td>${t.priority ? `<span class="badge ${escapeHtml(t.priority)}">${escapeHtml(t.priority)}</span>` : ''}</td>
+      <td>${escapeHtml(t.team)}</td>
+      <td class="muted">${escapeHtml(t.updated_at)}</td>
+    </tr>`).join('');
+}
+
+/* ---------- Live log ---------- */
+let lastCount = 0;
+async function pollLogs() {
+  const res = await fetch('/logs');
+  const data = await res.json();
+  if (data.length !== lastCount) {
+    const box = document.getElementById('logs');
+    box.innerHTML = data.map(l => `<div class="log-line ${l.level}"><span class="t">[${l.time}]</span>${escapeHtml(l.message)}</div>`).join('');
+    box.scrollTop = box.scrollHeight;
+    lastCount = data.length;
+  }
+}
+
+/* ---------- Sidebar: 3 open + 1 recently closed, straight from DB ---------- */
+function timeAgo(isoString) {
+  if (!isoString) return '';
+  const then = new Date(isoString);
+  const diffMs = Date.now() - then.getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+let lastSidebarSignature = '';
+async function pollSidebar() {
+  const res = await fetch('/sidebar');
+  const data = await res.json();
+  const signature = JSON.stringify(data);
+  if (signature === lastSidebarSignature) return;
+  lastSidebarSignature = signature;
+
+  const openBox = document.getElementById('sidebar-open');
+  if (!data.open || !data.open.length) {
+    openBox.innerHTML = '<div class="empty-state">No open incidents</div>';
+  } else {
+    openBox.innerHTML = data.open.map(inc => `
+      <div class="side-card">
+        <div class="side-card-top">
+          <span class="ticket-key">${escapeHtml(inc.ticket_number)}</span>
+          ${inc.severity ? `<span class="badge ${escapeHtml(inc.severity)}">${escapeHtml(inc.severity)}</span>` : ''}
+        </div>
+        <div class="side-card-title">${escapeHtml(inc.title)}</div>
+        <div class="side-card-meta">
+          <span>${escapeHtml(inc.team || 'Unassigned')}</span>
+          <span>&middot;</span>
+          <span>${escapeHtml(inc.status)}</span>
+          <span>&middot;</span>
+          <span>${timeAgo(inc.created_at)}</span>
+        </div>
+        ${inc.team_users && inc.team_users.length ? `
+          <div class="users-list">
+            ${inc.team_users.map(u => `
+              <div class="user-row">
+                <span class="dot active"></span>
+                <span>${escapeHtml(u.name)}</span>
+                <span class="muted">${escapeHtml(u.email)}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `).join('');
+  }
+
+  const closedBox = document.getElementById('sidebar-closed');
+  if (!data.recent_closed) {
+    closedBox.innerHTML = '<div class="empty-state">Nothing closed yet</div>';
+  } else {
+    const inc = data.recent_closed;
+    closedBox.innerHTML = `
+      <div class="side-card closed-strip">
+        <div class="side-card-top">
+          <span class="ticket-key">${escapeHtml(inc.ticket_number)}</span>
+          ${inc.severity ? `<span class="badge Low">${escapeHtml(inc.severity)}</span>` : ''}
+        </div>
+        <div class="side-card-title">${escapeHtml(inc.title)}</div>
+        <div class="side-card-meta">
+          <span>${escapeHtml(inc.team || 'Unassigned')}</span>
+          <span>&middot;</span>
+          <span>${escapeHtml(inc.status)}</span>
+          <span>&middot;</span>
+          <span>${timeAgo(inc.resolved_at)}</span>
+        </div>
+      </div>
+    `;
+  }
+}
+
+/* ---------- Eval panel (#7): recent agent decisions, labelable ---------- */
+async function labelDecision(id, label) {
+  await fetch(`/decisions/${id}/label`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label }),
+  });
+  lastEvalSignature = ''; // force a refresh on next poll
+  pollEval();
+}
+
+let lastEvalSignature = '';
+async function pollEval() {
+  const res = await fetch('/decisions?limit=15');
+  const data = await res.json();
+  const signature = JSON.stringify(data);
+  if (signature === lastEvalSignature) return;
+  lastEvalSignature = signature;
+
+  const box = document.getElementById('eval-list');
+  if (!data.length) {
+    box.innerHTML = '<div class="empty-state">No decisions logged yet</div>';
+    return;
+  }
+
+  box.innerHTML = data.map(d => {
+    const dec = d.decision || {};
+    const confPill = `<span class="pill ${d.confidence === 'high' ? 'high' : 'low'}">${escapeHtml(d.confidence || 'n/a')} confidence</span>`;
+    const checkPill = `<span class="pill ${d.self_check_passed ? 'pass' : 'fail'}">self-check ${d.self_check_passed ? 'passed' : 'failed'}</span>`;
+    const reviewPill = dec.needs_human_review ? '<span class="pill review">needs review</span>' : '';
+    const injectionPill = d.prompt_injection_flag ? '<span class="pill review">injection heuristic</span>' : '';
+
+    let labelHtml;
+    if (d.human_label) {
+      labelHtml = `<span class="label-tag ${d.human_label}">${d.human_label}</span>`;
+    } else {
+      labelHtml = `
+        <div class="eval-actions">
+          <button class="btn-correct" onclick="labelDecision(${d.id}, 'correct')">Mark correct</button>
+          <button class="btn-incorrect" onclick="labelDecision(${d.id}, 'incorrect')">Mark incorrect</button>
+        </div>`;
+    }
+
+    return `
+      <div class="eval-card">
+        <div class="eval-top">
+          <span class="ticket-key">${escapeHtml(d.ticket_number)}</span>
+          <span class="muted" style="font-size:11px;">${d.iteration_count} iter &middot; top sim ${d.top_similarity != null ? d.top_similarity.toFixed(2) : 'n/a'}</span>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin:6px 0;">
+          ${confPill} ${checkPill} ${reviewPill} ${injectionPill}
+        </div>
+        <div class="eval-reasoning">
+          <b>${escapeHtml(dec.priority || '')}</b> &rarr; ${escapeHtml(dec.assignee_team || 'unassigned')}<br>
+          ${escapeHtml(dec.reasoning || 'No decision reached.')}
+        </div>
+        <div class="eval-notes">${escapeHtml(d.self_check_notes || '')}</div>
+        ${labelHtml}
+      </div>`;
+  }).join('');
+}
+
+setInterval(() => { pollLogs(); pollTickets(); pollSidebar(); pollEval(); }, 3000);
+pollLogs();
+pollTickets();
+pollSidebar();
+pollEval();
+</script>
+</body>
+</html>
